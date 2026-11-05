@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UI test</title><link rel="stylesheet" href="../css/style.css"></head>
+<body>
+<div id="canvas-container"></div><div id="hud"></div><div id="editor-ui"></div><div id="popups"></div><div id="toasts"></div><div id="modal"></div><div id="debug"></div>
+<script src="../lib/three.min.js"></script>
+<script src="../js/core/util.js"></script><script src="../js/core/render.js"></script><script src="../js/core/camera.js"></script>
+<script src="../js/core/input.js"></script><script src="../js/core/ui.js"></script><script src="../js/core/audio.js"></script><script src="../js/core/save.js"></script>
+<script>
+(function () {
+  const R = SP.render, ui = SP.ui;
+  R.init(document.getElementById('canvas-container'));
+  const scene = new THREE.Scene(); scene.background = new THREE.Color(0x0d121d);
+  const lights = R.makeLights(scene, 'editor');
+  const cam = new SP.cam.Iso({ frustum: 14 }); cam.target.set(0, 1, 0);
+  const ped = R.cel(new THREE.CylinderGeometry(5, 5.4, 0.5, 32), 0x272f44, { outline: 0.03 }); ped.position.y = -0.25; scene.add(ped);
+  const ring = R.cel(new THREE.TorusGeometry(5, 0.07, 8, 48), 0x22d3ee, { outline: 0, emissive: 0x22d3ee, emissiveIntensity: 1 }); ring.rotation.x = Math.PI / 2; scene.add(ring);
+  const N = 40, inst = R.celInstanced(new THREE.DodecahedronGeometry(0.5), 0x22c55e, N, { outline: 0.08 });
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), p = new THREE.Vector3(), s = new THREE.Vector3(), c = new THREE.Color();
+  const rng = SP.util.rng(3);
+  for (let i = 0; i < N; i++) { const a = i / N * 6.283, r = 1.5 + rng.range(0, 2.8); p.set(Math.cos(a) * r, 0.5 + rng.range(0, 0.4), Math.sin(a) * r); s.setScalar(rng.range(0.6, 1.3)); q.setFromEuler(new THREE.Euler(rng.range(0, 3), rng.range(0, 3), 0)); m.compose(p, q, s); inst.setMatrixAt(i, m); inst.setColorAt(i, c.setHex(rng.pick(R.PALETTE))); }
+  inst.update(); scene.add(inst.group);
+  const cone = R.cel(new THREE.ConeGeometry(0.8, 1.8, 10), 0xf43f5e); cone.position.set(0, 0.9, 0); scene.add(cone);
+  const parts = R.particles(scene);
+
+  const hud = ui.hud();
+  const col = ui.el('div', 'demo-col'); hud.appendChild(col);
+  const p1 = ui.panel(); col.appendChild(p1);
+  const hp = ui.bar({ label: 'Health', icon: '❤️', color: 'rose', max: 100, width: 220 }); hp.set(72); p1.appendChild(hp.el);
+  const evo = ui.bar({ label: 'Evolution', icon: '🧬', color: 'purple', max: 100, width: 220 }); evo.set(35); evo.el.style.marginTop = '8px'; p1.appendChild(evo.el);
+  const row = ui.el('div', 'hud-row'); row.style.marginTop = '10px'; p1.appendChild(row);
+  const dna = ui.counter({ icon: '🧬', color: 'cyan' }); dna.set(120); row.appendChild(dna.el);
+  const food = ui.counter({ icon: '🍓', color: 'rose' }); food.set(8); row.appendChild(food.el);
+  const p2 = ui.panel(); col.appendChild(p2);
+  const r2 = ui.el('div', 'hud-row'); p2.appendChild(r2);
+  ['green', 'cyan', 'purple', 'rose', 'amber', 'slate', 'indigo'].forEach(function (cl) { r2.appendChild(ui.button(cl, { color: cl, small: true })); });
+  const r3 = ui.el('div', 'hud-row'); r3.style.marginTop = '10px'; p2.appendChild(r3);
+  r3.appendChild(ui.button('Toast', { color: 'cyan', icon: '🔔', onClick: function () { ui.toast('Bone pile found!', '🦴'); } }));
+  r3.appendChild(ui.button('Banner', { color: 'amber', icon: '🏁', onClick: function () { ui.banner('Cell Stage', 'Swim, eat, evolve!', 2500); } }));
+  r3.appendChild(ui.button('Modal', { color: 'purple', icon: '🪟', onClick: function () { ui.modal({ title: 'Hello', body: 'A comic modal with <b>HTML</b> body.', buttons: [{ label: 'Nope', color: 'slate' }, { label: 'Yes!', color: 'green' }] }); } }));
+  r3.appendChild(ui.button('Card', { color: 'green', icon: '🏆', onClick: function () { ui.stageCard({ stage: 'cell', card: 'carnivore', title: 'Cell Stage complete!', lines: ['🍖 Ate 42 meat chunks', '🌿 Ate 12 plants', '🧬 Collected 250 DNA'] }); } }));
+  r3.appendChild(ui.button('Burst', { color: 'rose', icon: '💥', onClick: function () { parts.burst(new THREE.Vector3(0, 1.5, 0), 0xf43f5e, 24, 1.2); ui.popup(new THREE.Vector3(0, 2.5, 0), cam.camera, '+25 🧬', 'pop-gold'); } }));
+  const p3 = ui.panel(); col.appendChild(p3);
+  p3.appendChild(ui.el('div', 'bar-label stroke-sm', 'SFX'));
+  const r4 = ui.el('div', 'hud-row'); r4.style.maxWidth = '380px'; p3.appendChild(r4);
+  SP.audio.names.forEach(function (n) { r4.appendChild(ui.button(n, { small: true, color: 'slate', sfx: 'none', onClick: function () { SP.audio.init(); SP.audio.sfx(n); } })); });
+  const r5 = ui.el('div', 'hud-row'); r5.style.marginTop = '8px'; p3.appendChild(r5);
+  SP.audio.moods.forEach(function (n) { r5.appendChild(ui.button('♪ ' + n, { small: true, color: 'indigo', onClick: function () { SP.audio.init(); SP.audio.music(n); } })); });
+  const ab = ui.abilityBar([{ id: 'bite', icon: '🦷', key: '1', level: 3, cooldown: 4 }, { id: 'charge', icon: '💨', key: '2', level: 1, cooldown: 8 }, { id: 'sing', icon: '🎵', key: '5', level: 5, cooldown: 3 }, { id: 'dance', icon: '💃', key: '6', level: 0, cooldown: 3 }]);
+  const bc = ui.el('div', 'hud-corner hud-bc'); bc.appendChild(ab.el); hud.appendChild(bc);
+  ab.setActive('sing', true);
+  const mm = ui.minimap({ size: 140 }); const tr = ui.el('div', 'hud-corner hud-tr'); tr.appendChild(mm.el); hud.appendChild(tr);
+
+  let t = 0, last = performance.now();
+  (function loop(now) {
+    requestAnimationFrame(loop);
+    const dt = Math.min(0.05, (now - last) / 1000); last = now; t += dt;
+    inst.group.rotation.y = t * 0.3; cone.rotation.y = t;
+    ab.setCooldown('bite', 1 - ((t / 4) % 1)); ab.setCooldown('charge', 1 - ((t / 8) % 1) * 0.5);
+    mm.draw(function (ctx, w, h) { ctx.fillStyle = '#22c55e'; ctx.beginPath(); ctx.arc(w / 2 + Math.cos(t) * 30, h / 2 + Math.sin(t) * 30, 6, 0, 7); ctx.fill(); ctx.fillStyle = '#f43f5e'; ctx.fillRect(w / 2 - 3, h / 2 - 3, 6, 6); });
+    cam.update(dt); parts.update(dt);
+    R.render(scene, cam.camera); SP.input.endFrame();
+  })(last);
+  window.addEventListener('load', function () { setTimeout(function () { ui.toast('UI demo ready', '✅', 6000); ui.banner('Primordia Web', 'ui test', 6000); ui.popupAt(700, 400, '+3 🧬', 'pop-green'); }, 300); });
+})();
+</script></body></html>

@@ -1,0 +1,184 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Creature harness</title>
+<style>
+  html,body{margin:0;height:100%;background:#0d121d;color:#fff;font-family:"Trebuchet MS",sans-serif;overflow:hidden}
+  #c{position:fixed;inset:0}
+  #ui{position:fixed;left:8px;top:8px;background:rgba(18,24,38,.92);border:3px solid #080c14;border-radius:12px;padding:6px 10px;font-size:13px;z-index:5}
+  #ui select,#ui input{vertical-align:middle}
+  .lbl{position:fixed;font-size:11px;line-height:1.15;text-shadow:0 0 3px #000,0 0 3px #000;pointer-events:none;white-space:nowrap;transform:translate(-50%,0);text-align:center;z-index:2}
+  #log{position:fixed;right:8px;top:8px;font:11px monospace;max-width:420px;background:rgba(0,0,0,.6);padding:4px 8px;border-radius:6px;z-index:5;white-space:pre-wrap}
+</style></head>
+<body>
+<div id="c"></div>
+<div id="ui">
+  action <select id="act"><option value="">(none)</option></select>
+  speed <input id="spd" type="range" min="0" max="1.3" step="0.01" value="0.5" style="width:120px"> <span id="spdv"></span>
+  <label><input type="checkbox" id="pause"> pause</label>
+  seed <input id="seed" value="7" size="4">
+</div>
+<div id="log"></div>
+<script src="../lib/three.min.js"></script>
+<script src="../js/core/util.js"></script>
+<script src="../js/core/render.js"></script>
+<script src="../js/creature/parts.js"></script>
+<script src="../js/creature/model.js"></script>
+<script src="../js/creature/mesh.js"></script>
+<script src="../js/creature/anim.js"></script>
+<script src="../js/creature/gen.js"></script>
+<script>
+(function () {
+  'use strict';
+  const q = new URLSearchParams(location.search);
+  const log = document.getElementById('log');
+  const logs = [];
+  const say = (m) => { logs.push(m); log.textContent = logs.slice(-14).join('\n'); };
+  window.addEventListener('error', (e) => say('ERR ' + e.message));
+
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setPixelRatio(1);
+  renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.setClearColor(0x0d121d, 1);
+  document.getElementById('c').appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const lights = SP.render.makeLights(scene, 'editor');
+  lights.ambient.intensity = 0.55; lights.sun.intensity = 0.95; lights.sun.position.set(14, 28, 14); lights.sun.shadow.camera.left = -30; lights.sun.shadow.camera.right = 30; lights.sun.shadow.camera.top = 30; lights.sun.shadow.camera.bottom = -30;
+  lights.sun.shadow.camera.far = 90; lights.sun.shadow.mapSize.set(2048, 2048);
+  const camera = new THREE.PerspectiveCamera(42, 1, 0.1, 200);
+
+  // checker ground: lets you see feet sticking to the floor
+  (function () {
+    const N = 60, pos = [], col = [], idx = [];
+    const a = new THREE.Color(0x3f6212), b = new THREE.Color(0x4d7c0f);
+    for (let i = 0; i < N; i++) for (let j = 0; j < N; j++) {
+      const x0 = i - N / 2, z0 = j - N / 2, c = ((i + j) & 1) ? a : b, k = pos.length / 3;
+      pos.push(x0, 0, z0, x0 + 1, 0, z0, x0 + 1, 0, z0 + 1, x0, 0, z0 + 1);
+      for (let t = 0; t < 4; t++) col.push(c.r, c.g, c.b);
+      idx.push(k, k + 2, k + 1, k, k + 3, k + 2);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3)); g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+    g.setIndex(idx); g.computeVertexNormals();
+    const m = new THREE.Mesh(g, SP.render.toon(0xffffff, { vertexColors: true })); m.receiveShadow = true; scene.add(m);
+  })();
+
+  const actSel = document.getElementById('act');
+  ['bite', 'charge', 'strike', 'spit', 'sing', 'dance', 'charm', 'pose', 'eat', 'hurt', 'die', 'mate', 'celebrate', 'sneak', 'jump', 'glide', 'swim'].forEach((a) => { const o = document.createElement('option'); o.value = a; o.textContent = a; actSel.appendChild(o); });
+  if (q.get('action')) actSel.value = q.get('action');
+  const spd = document.getElementById('spd'); if (q.get('speed') !== null) spd.value = q.get('speed');
+  const seedIn = document.getElementById('seed'); if (q.get('seed')) seedIn.value = q.get('seed');
+  const pauseCb = document.getElementById('pause');
+
+  let items = [];
+  function clearItems() { items.forEach((it) => { it.rig.dispose(); if (it.el) it.el.remove(); }); items = []; }
+
+  const GAITS = ['biped', 'quad', 'multi', 'slither', 'biped', 'quad', 'quad', 'multi', 'biped', 'slither', 'quad', 'biped'];
+  const SIZES = ['medium', 'small', 'large', 'medium', 'tiny', 'medium', 'small', 'small', 'large', 'large', 'large', 'medium'];
+  function setup() {
+    clearItems();
+    const seed = Number(seedIn.value) || 7;
+    const rng = SP.util.rng(seed);
+    const list = [];
+    list.push({ d: SP.creature.defaultDesign('creature'), tag: 'default' });
+    const nGen = q.get('n') ? Number(q.get('n')) : 12;
+    for (let i = 0; i < nGen; i++) list.push({ d: SP.creature.generate(rng, { gaitHint: GAITS[i % 12], sizeTier: SIZES[i % 12] }), tag: 'gen' });
+    const cells = [];
+    for (let i = 0; i < 5; i++) cells.push({ d: i === 0 ? SP.creature.defaultDesign('cell') : SP.creature.generate(rng, { kind: 'cell', sizeTier: ['small', 'medium', 'small', 'large', 'tiny'][i] }), tag: 'cell' });
+    const focus = q.get('focus');
+    const cols = 5, sp = 8;
+    let all = list.concat(cells);
+    if (focus !== null) { all = [all[Number(focus)]]; }
+    const t0 = performance.now();
+    all.forEach((e, i) => {
+      const isCell = e.d.kind === 'cell';
+      const v = SP.creature.validate(e.d);
+      if (!v.ok) say('INVALID ' + e.d.name + ': ' + v.errors.join(';'));
+      const tb = performance.now();
+      const rig = SP.creature.build(e.d, { outline: true, shadows: true, lod: q.get('lod') || 'high' });
+      const bt = performance.now() - tb;
+      let cx, cz, R;
+      if (focus !== null) { cx = 0; cz = 0; R = 2.6; }
+      else if (isCell) { const k = i - list.length; cx = (k - 2) * 7; cz = 18; R = 1.6; }
+      else { cx = (i % cols - (cols - 1) / 2) * sp; cz = (Math.floor(i / cols) - 1.5) * sp; R = 2.6; }
+      scene.add(rig.root);
+      const el = document.createElement('div'); el.className = 'lbl'; document.body.appendChild(el);
+      const st = rig.stats;
+      el.innerHTML = '<b>' + e.d.name + '</b> ' + st.gait + (st.legs ? ' x' + st.legs : '') + '<br>m ' + st.mass.toFixed(1) + ' v ' + st.topSpeed.toFixed(1) + (bt > 8 ? ' build ' + bt.toFixed(0) + 'ms' : '');
+      items.push({ rig: rig, cx: cx, cz: cz, R: R, a: i * 0.7, el: el, isCell: isCell, bt: bt, s: { speed: 0, turn: 0, action: null, actionT: 0, airborne: false, inWater: false, lookAt: new THREE.Vector3() } });
+    });
+    say('built ' + items.length + ' in ' + (performance.now() - t0).toFixed(0) + 'ms; max single ' + Math.max.apply(null, items.map((x) => x.bt)).toFixed(1) + 'ms');
+  }
+  setup();
+  seedIn.addEventListener('change', setup);
+
+  function resize() {
+    const w = innerWidth, h = innerHeight;
+    renderer.setSize(w, h); camera.aspect = w / h; camera.updateProjectionMatrix();
+    if (q.get('focus') !== null) { camera.position.set(Number(q.get('cx') || 7), Number(q.get('cy') || 5), Number(q.get('cz') || 10)); camera.lookAt(0, 0.9, 0); }
+    else { camera.position.set(0, 34, 30); camera.lookAt(0, 0, 4); camera.fov = 44; camera.updateProjectionMatrix(); }
+  }
+  addEventListener('resize', resize); resize();
+
+  let clock = performance.now(), T = 0, frames = 0, actT = 0, lastAct = '';
+  const v3 = new THREE.Vector3();
+  window.__tick = 0;
+  function frame() {
+    const now = performance.now(); let dt = Math.min(0.05, (now - clock) / 1000); clock = now;
+    if (q.get('fixed')) dt = 1 / 30;
+    if (pauseCb.checked) dt = 0;
+    T += dt;
+    const act = actSel.value || null;
+    if (act !== lastAct) { actT = 0; lastAct = act; }
+    actT += dt;
+    const frac = Number(spd.value); document.getElementById('spdv').textContent = frac.toFixed(2);
+    for (const it of items) {
+      const r = it.rig, st = r.stats, s = it.s;
+      const top = it.isCell ? st.topSpeed * 0.5 : st.topSpeed;
+      let speed = frac * top;
+      if (act === 'sneak') speed *= 0.4;
+      const omega = speed / it.R;
+      it.a += omega * dt;
+      s.speed = speed; s.turn = omega; s.action = act; s.actionT = actT;
+      s.airborne = act === 'jump' || act === 'glide';
+      s.inWater = act === 'swim';
+      const jy = act === 'jump' ? Math.abs(Math.sin(T * 3)) * 1.5 : (act === 'glide' ? 1.5 + Math.sin(T) * 0.2 : 0);
+      s.airborne = jy > 0.05;
+      const th = it.a;
+      r.root.position.set(it.cx - Math.cos(th) * it.R, jy, it.cz + Math.sin(th) * it.R);
+      r.root.rotation.y = th;
+      s.lookAt.set(Math.sin(T * 0.7) * 6 + it.cx, 1.2, Math.cos(T * 0.5) * 4 + it.cz + 3);
+      SP.creature.animate(r, dt, s);
+      v3.copy(r.root.position); v3.y += st.height * 1.15 + 0.6; v3.project(camera);
+      it.el.style.left = ((v3.x * 0.5 + 0.5) * innerWidth) + 'px'; it.el.style.top = ((-v3.y * 0.5 + 0.5) * innerHeight - 10) + 'px';
+    }
+    renderer.render(scene, camera);
+    frames++; window.__tick = frames; window.__calls = renderer.info.render.calls; if (frames === 30) say('draw calls/frame (' + items.length + ' rigs, lod ' + (q.get('lod') || 'high') + '): ' + renderer.info.render.calls);
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ---- in-page asserts
+  const res = [];
+  const ok = (c, m) => { res.push((c ? 'ok   ' : 'FAIL ') + m); if (!c) say('FAIL ' + m); };
+  (function checks() {
+    const C = SP.creature, d = C.defaultDesign(), s = C.stats(d);
+    const h = C.clone(d); h.spine.forEach((n) => n.r *= 1.4); const sh = C.stats(h);
+    ok(sh.topSpeed < s.topSpeed && sh.accel < s.accel, 'heavier slower');
+    const f = (x) => x.topSpeed * Math.pow(x.mass / 6, 0.25);
+    const l = C.clone(d); l.parts.forEach((p) => { if (p.id === 'leg_stub_1') p.len = 2; });
+    ok(f(C.stats(l)) > f(s), 'longer legs faster');
+    const qd = C.clone(d); const lg = C.clone(qd.parts.find((p) => p.id === 'leg_stub_1')); lg.uid = 'zz'; lg.v = 3; qd.parts.push(lg);
+    ok(C.stats(qd).gait === 'quad' && C.stats(qd).stability / C.stats(qd).mass > s.stability / s.mass, 'quad more stable');
+    const a = C.clone(d); for (let i = 0; i < 4; i++) { const p = C.clone(a.parts[0]); p.id = 'mouth_shred_4'; p.uid = 'm' + i; a.parts.push(p); }
+    ok(C.stats(a).abilities.bite === 5, 'ability cap 5');
+    const rng = SP.util.rng(99); let bad = 0; const gaits = {};
+    for (let i = 0; i < 60; i++) { const g = C.generate(rng, {}); const v = C.validate(g); gaits[C.stats(g).gait] = 1; if (!v.ok) { bad++; say('gen invalid ' + v.errors); } }
+    ok(bad === 0 && Object.keys(gaits).length >= 4, '60 generated designs valid, gaits: ' + Object.keys(gaits).join(','));
+    let cbad = 0; for (let i = 0; i < 20; i++) { const g = C.generate(rng, { kind: 'cell' }); if (!C.validate(g).ok) cbad++; }
+    ok(cbad === 0, '20 generated cells valid');
+    const t0 = performance.now(); for (let i = 0; i < 20; i++) { const rg = C.build(C.generate(rng, {})); rg.dispose(); } const bt = (performance.now() - t0) / 20;
+    ok(bt < 15, 'avg build ' + bt.toFixed(1) + 'ms < 15');
+    window.__results = res; say(res.join('\n'));
+  })();
+})();
+</script></body></html>

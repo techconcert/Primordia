@@ -1,0 +1,1556 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>PrimordiaCraft 3D: Modular Evolution & World Exploration</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { user-select: none; -webkit-user-select: none; box-sizing: border-box; }
+    body, html {
+      margin: 0; padding: 0; width: 100%; height: 100%;
+      overflow: hidden; background-color: #0d121d;
+      font-family: 'Fredoka', cursive, sans-serif;
+    }
+    #canvas-container { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; }
+    .comic-panel {
+      background: rgba(18, 24, 38, 0.94);
+      border: 3.5px solid #080c14;
+      box-shadow: 0 6px 0 #080c14, inset 0 2px 0 rgba(255, 255, 255, 0.12);
+      border-radius: 18px;
+    }
+    .comic-btn {
+      border: 3px solid #080c14;
+      box-shadow: 0 4px 0 #080c14, inset 0 2px 0 rgba(255, 255, 255, 0.25);
+      transition: transform 0.08s ease, filter 0.12s ease, box-shadow 0.08s ease;
+      cursor: pointer;
+    }
+    .comic-btn:hover { filter: brightness(1.1); }
+    .comic-btn:active {
+      transform: translateY(3.5px);
+      box-shadow: 0 1px 0 #080c14, inset 0 1px 0 rgba(255, 255, 255, 0.18);
+    }
+    .text-stroke {
+      text-shadow:
+        -2px -2px 0 #080c14,  2px -2px 0 #080c14,
+        -2px  2px 0 #080c14,  2px  2px 0 #080c14,
+         0px  3px 0 #080c14;
+    }
+    .text-stroke-sm {
+      text-shadow:
+        -1.5px -1.5px 0 #080c14,  1.5px -1.5px 0 #080c14,
+        -1.5px  1.5px 0 #080c14,  1.5px  1.5px 0 #080c14;
+    }
+    .float-pop {
+      position: absolute; pointer-events: none; z-index: 40;
+      font-weight: 800; font-size: 19px; transform: translate(-50%, -50%);
+      animation: popUpFade 1.05s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+    @keyframes popUpFade {
+      0% { opacity: 0; transform: translate(-50%, 15%) scale(0.6); }
+      18% { opacity: 1; transform: translate(-50%, -50%) scale(1.18); }
+      100% { opacity: 0; transform: translate(-50%, -170%) scale(0.9); }
+    }
+    .custom-scrollbar::-webkit-scrollbar { width: 5px; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #334155; border-radius: 9999px; }
+  </style>
+</head>
+<body>
+
+  <!-- 3D Three.js Container -->
+  <div id="canvas-container"></div>
+  <div id="overlay-container" class="absolute inset-0 pointer-events-none overflow-hidden z-20"></div>
+
+  <!-- ================= CREATURE LAB GUI ================= -->
+  <div id="ui-lab" class="absolute inset-0 pointer-events-none z-30 flex flex-col justify-between p-3 md:p-6 transition-opacity duration-300">
+    <!-- Top Header Bar -->
+    <div class="flex items-center justify-between gap-3 pointer-events-auto">
+      <div class="comic-panel px-4 py-2 flex items-center gap-3">
+        <span class="text-3xl">🧬</span>
+        <div>
+          <h1 class="text-xl md:text-2xl font-extrabold text-amber-400 text-stroke leading-tight tracking-wide">PRIMORDIACRAFT 3D</h1>
+          <p class="text-[11px] font-bold text-slate-300 uppercase tracking-wider">Modular Adaptation & Kinematic Gaits</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button id="btn-randomize" class="comic-btn bg-purple-600 text-white font-extrabold px-3.5 py-2 rounded-xl text-xs md:text-sm flex items-center gap-1.5">
+          <span>🎲</span> RANDOMIZE
+        </button>
+        <button id="btn-lab-dance" class="comic-btn bg-cyan-600 text-white font-extrabold px-3 py-2 rounded-xl text-xs md:text-sm flex items-center gap-1.5">
+          <span id="dance-icon">🕺</span> DANCE TEST
+        </button>
+      </div>
+    </div>
+
+    <!-- Side Mutation Selector Panel -->
+    <div class="pointer-events-auto flex items-end md:items-center">
+      <div class="comic-panel p-3.5 md:p-4 w-72 md:w-84 max-h-[72vh] flex flex-col gap-3 custom-scrollbar overflow-y-auto">
+        <div class="flex items-center justify-between pb-1 border-b border-slate-700/80">
+          <span class="text-xs font-bold text-amber-300 uppercase tracking-wider">Adaptation Slots</span>
+          <span class="text-[10px] text-slate-400 font-bold">Drag base to spin</span>
+        </div>
+
+        <!-- 1. Body Chassis -->
+        <div>
+          <label class="text-xs font-extrabold text-emerald-400 flex items-center gap-1.5 mb-1">
+            <span>🟢</span> 1. BODY CHASSIS
+          </label>
+          <div class="grid grid-cols-3 gap-1.5" id="group-body">
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-emerald-600 text-white" data-slot="body" data-val="blob">Round Blob</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="body" data-val="grub">Grub Segments</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="body" data-val="tank">Carapace Tank</button>
+          </div>
+        </div>
+
+        <!-- 2. Locomotion Limbs -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-extrabold text-indigo-400 flex items-center gap-1.5">
+              <span>🦵</span> 2. LOCOMOTION GAIT
+            </label>
+            <span id="label-loco-desc" class="text-[10px] font-bold text-indigo-300 px-1.5 py-0.5 rounded bg-indigo-950/60 border border-indigo-700/60">Hopper</span>
+          </div>
+          <div class="grid grid-cols-2 gap-1.5" id="group-rear">
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-indigo-600 text-white" data-slot="rear" data-val="biped">Biped Hopper</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="rear" data-val="quad">Quadruped Trot</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="rear" data-val="centipede">Centipede Scuttle</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="rear" data-val="slither">Snake Slither</button>
+          </div>
+        </div>
+
+        <!-- 3. Front Appendages / Weapon Role -->
+        <div>
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-xs font-extrabold text-rose-400 flex items-center gap-1.5">
+              <span>⚔️</span> 3. FRONT WEAPON / ROLE
+            </label>
+            <span id="label-role-desc" class="text-[10px] font-bold text-rose-300 px-1.5 py-0.5 rounded bg-rose-950/60 border border-rose-700/60">Melee Striker</span>
+          </div>
+          <div class="grid grid-cols-3 gap-1.5" id="group-front">
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-rose-600 text-white" data-slot="front" data-val="pincers">Pincers</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="front" data-val="thorns">Thorn Spines</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="front" data-val="flippers">Flippers</button>
+          </div>
+        </div>
+
+        <!-- 4. Eyes -->
+        <div>
+          <label class="text-xs font-extrabold text-cyan-400 flex items-center gap-1.5 mb-1">
+            <span>👀</span> 4. OCULAR SENSORS
+          </label>
+          <div class="grid grid-cols-3 gap-1.5" id="group-eyes">
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-cyan-600 text-white" data-slot="eyes" data-val="stalks">Eye Stalks</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="eyes" data-val="triple">Triple Spider</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="eyes" data-val="cyclops">Cyclops Lens</button>
+          </div>
+        </div>
+
+        <!-- 5. Mouth -->
+        <div>
+          <label class="text-xs font-extrabold text-amber-400 flex items-center gap-1.5 mb-1">
+            <span>👄</span> 5. FEEDING MAW
+          </label>
+          <div class="grid grid-cols-3 gap-1.5" id="group-mouth">
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-amber-600 text-white" data-slot="mouth" data-val="toothy">Toothy Maw</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="mouth" data-val="beak">Beak Snout</button>
+            <button class="comic-btn part-btn text-[11px] font-bold py-1.5 rounded-lg bg-slate-700 text-slate-200" data-slot="mouth" data-val="vacuum">Proboscis</button>
+          </div>
+        </div>
+
+        <!-- Pigment Coating -->
+        <div class="pt-1 border-t border-slate-700/80">
+          <span class="text-[11px] font-bold text-slate-300 block mb-1">Pigment Palette</span>
+          <div class="flex items-center gap-2" id="color-swatches"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Diagnostics & World Launch -->
+    <div class="flex flex-col md:flex-row items-center justify-between gap-3 pointer-events-auto">
+      <div class="comic-panel px-4 py-2.5 flex items-center gap-4 sm:gap-6 w-full md:w-auto">
+        <div class="flex flex-col">
+          <span class="text-[10px] uppercase font-bold text-slate-400">Speed</span>
+          <div class="flex items-center gap-1.5">
+            <div class="w-16 sm:w-20 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div id="stat-speed-bar" class="h-full bg-cyan-400 transition-all duration-300" style="width: 60%;"></div>
+            </div>
+            <span id="stat-speed-val" class="text-xs font-extrabold text-cyan-300">6</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col">
+          <span class="text-[10px] uppercase font-bold text-slate-400">Bounce / Flex</span>
+          <div class="flex items-center gap-1.5">
+            <div class="w-16 sm:w-20 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div id="stat-bounce-bar" class="h-full bg-purple-400 transition-all duration-300" style="width: 80%;"></div>
+            </div>
+            <span id="stat-bounce-val" class="text-xs font-extrabold text-purple-300">8</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col">
+          <span class="text-[10px] uppercase font-bold text-slate-400">Combat Power</span>
+          <div class="flex items-center gap-1.5">
+            <div class="w-16 sm:w-20 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div id="stat-power-bar" class="h-full bg-rose-500 transition-all duration-300" style="width: 90%;"></div>
+            </div>
+            <span id="stat-power-val" class="text-xs font-extrabold text-rose-300">9</span>
+          </div>
+        </div>
+
+        <div class="flex flex-col">
+          <span class="text-[10px] uppercase font-bold text-slate-400">Harvest Aura</span>
+          <div class="flex items-center gap-1.5">
+            <div class="w-16 sm:w-20 h-2 bg-slate-800 rounded-full overflow-hidden border border-slate-700">
+              <div id="stat-harvest-bar" class="h-full bg-amber-400 transition-all duration-300" style="width: 30%;"></div>
+            </div>
+            <span id="stat-harvest-val" class="text-xs font-extrabold text-amber-300">3</span>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-spawn-world" class="comic-btn bg-gradient-to-r from-emerald-500 via-teal-500 to-cyan-500 text-white font-extrabold text-base md:text-lg px-8 py-3.5 rounded-2xl flex items-center justify-center gap-2.5 w-full md:w-auto shadow-xl hover:scale-105">
+        <span>🌍</span>
+        <span class="text-stroke tracking-wide">SPAWN INTO WORLD!</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- ================= WORLD EXPLORATION HUD ================= -->
+  <div id="ui-world" class="absolute inset-0 pointer-events-none z-30 hidden flex-col justify-between p-3 md:p-6 transition-opacity duration-300">
+    <!-- Top HUD Bar -->
+    <div class="flex items-center justify-between gap-3 pointer-events-auto">
+      <div class="flex items-center gap-2.5">
+        <div class="comic-panel px-3.5 py-1.5 flex items-center gap-2 bg-slate-900/95">
+          <span class="text-2xl">🍓</span>
+          <div>
+            <div class="text-[10px] uppercase font-bold text-rose-300 leading-none">Organic Matter</div>
+            <div id="hud-score" class="text-lg md:text-xl font-extrabold text-amber-400 text-stroke-sm leading-tight">0 Units</div>
+          </div>
+        </div>
+        <div class="comic-panel px-3.5 py-1.5 hidden sm:flex items-center gap-2 bg-slate-900/95">
+          <span class="text-2xl" id="hud-role-icon">⚔️</span>
+          <div>
+            <div class="text-[10px] uppercase font-bold text-slate-300 leading-none">Active Role</div>
+            <div id="hud-role-name" class="text-xs font-extrabold text-cyan-400 leading-tight">Melee Striker</div>
+          </div>
+        </div>
+      </div>
+
+      <button id="btn-return-lab" class="comic-btn bg-gradient-to-b from-purple-500 to-indigo-600 text-white font-extrabold px-4 py-2 rounded-xl text-xs md:text-sm flex items-center gap-2">
+        <span>🔬</span> RETURN TO LAB
+      </button>
+    </div>
+
+    <!-- Controls Hints & World Action Buttons -->
+    <div class="flex flex-col sm:flex-row items-end justify-between gap-3 pointer-events-none">
+      <div class="comic-panel p-2.5 text-slate-300 text-xs flex flex-col gap-1 pointer-events-auto max-w-[270px]">
+        <div class="text-amber-400 font-extrabold flex items-center gap-1.5 text-xs">
+          <span>🎮</span> CONTROLS
+        </div>
+        <div class="text-[11px] leading-relaxed text-slate-300">
+          • <b class="text-white">WASD / Arrow Keys</b> or <b class="text-white">Click Ground</b> to Move<br>
+          • <b class="text-rose-400">[SPACE]</b> Trigger Adaptation Action<br>
+          • <b class="text-emerald-400">[E]</b> Eat Near Berries &nbsp;|&nbsp; <b class="text-amber-400">[Q]</b> Flourish
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 pointer-events-auto">
+        <button id="btn-world-action" class="comic-btn bg-rose-600 text-white font-extrabold px-4 py-3 rounded-2xl flex items-center gap-2 text-sm shadow-lg">
+          <span id="btn-action-icon" class="text-xl">⚔️</span>
+          <span id="btn-action-label" class="text-stroke-sm">Pincer Strike [Space]</span>
+        </button>
+        <button id="btn-world-eat" class="comic-btn bg-emerald-600 text-white font-extrabold px-3.5 py-3 rounded-2xl flex items-center gap-1.5 text-sm shadow-lg">
+          <span class="text-lg">🍓</span>
+          <span>Eat [E]</span>
+        </button>
+        <button id="btn-world-flourish" class="comic-btn bg-amber-500 text-slate-950 font-extrabold px-3 py-3 rounded-2xl flex items-center gap-1.5 text-sm shadow-lg">
+          <span class="text-lg">✨</span>
+          <span>Spin [Q]</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.onload = function() {
+      // ============================================================================
+      // 1. PALETTE & CONFIGURATION
+      // ============================================================================
+      const PALETTE = [
+        0x22c55e, // Emerald Green
+        0x06b6d4, // Cyan
+        0xa855f7, // Purple
+        0xf97316, // Orange
+        0xf43f5e, // Rose
+        0xeab308  // Gold
+      ];
+
+      const creatureConfig = {
+        body: 'blob',       // blob, grub, tank
+        rear: 'biped',      // biped, quad, centipede, slither
+        front: 'pincers',   // pincers, thorns, flippers
+        eyes: 'stalks',     // stalks, triple, cyclops
+        mouth: 'toothy',    // toothy, beak, vacuum
+        colorIndex: 0
+      };
+
+      let gameMode = 'lab'; // 'lab' or 'world'
+      let organicMatterScore = 0;
+      let isLabDancing = false;
+      let isDraggingLab = false;
+      let lastPointerX = 0;
+
+      // ============================================================================
+      // 2. 3-TONE CEL SHADING PIPELINE & OUTLINE LOGIC
+      // ============================================================================
+      const container = document.getElementById('canvas-container');
+      const overlayContainer = document.getElementById('overlay-container');
+
+      const scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x0d121d);
+
+      // Discrete 3-step gradient texture: [Shadow, Midtone, Highlight]
+      function createThreeToneGradient() {
+        const data = new Uint8Array([
+          55, 60, 75, 255,      // Dark Cel Shadow
+          165, 172, 190, 255,   // Mid Tone
+          255, 255, 255, 255    // Specular Highlight
+        ]);
+        const tex = new THREE.DataTexture(data, 3, 1, THREE.RGBAFormat);
+        tex.minFilter = THREE.NearestFilter;
+        tex.magFilter = THREE.NearestFilter;
+        tex.needsUpdate = true;
+        return tex;
+      }
+      const threeToneGradient = createThreeToneGradient();
+
+      const toonMaterialCache = {};
+      function getToonMaterial(hexColor) {
+        if (!toonMaterialCache[hexColor]) {
+          toonMaterialCache[hexColor] = new THREE.MeshToonMaterial({
+            color: hexColor,
+            gradientMap: threeToneGradient
+          });
+        }
+        return toonMaterialCache[hexColor];
+      }
+
+      const outlineMaterial = new THREE.MeshBasicMaterial({
+        color: 0x080c14,
+        side: THREE.BackSide
+      });
+
+      function createCelMesh(geometry, hexColor, outlineThickness = 0.07, castShadow = true, receiveShadow = true) {
+        const mesh = new THREE.Mesh(geometry, getToonMaterial(hexColor));
+        mesh.castShadow = castShadow;
+        mesh.receiveShadow = receiveShadow;
+
+        if (outlineThickness > 0) {
+          const outline = new THREE.Mesh(geometry.clone(), outlineMaterial);
+          outline.scale.setScalar(1 + outlineThickness);
+          mesh.add(outline);
+        }
+        return mesh;
+      }
+
+      // Orthographic Isometric Camera
+      const aspect = window.innerWidth / window.innerHeight;
+      const frustumSize = 16;
+      const camera = new THREE.OrthographicCamera(
+        -frustumSize * aspect / 2, frustumSize * aspect / 2,
+        frustumSize / 2, -frustumSize / 2,
+        -100, 100
+      );
+
+      const isoAngleX = Math.atan(1 / Math.SQRT2);
+      const isoAngleY = Math.PI / 4;
+      camera.rotation.order = 'YXZ';
+      camera.rotation.y = isoAngleY;
+      camera.rotation.x = -isoAngleX;
+
+      const labCamPos = new THREE.Vector3(14, 15, 14);
+      camera.position.copy(labCamPos);
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      container.appendChild(renderer.domElement);
+
+      // Scene Lights
+      const ambientLight = new THREE.AmbientLight(0xfff7ed, 0.75);
+      scene.add(ambientLight);
+
+      const sunLight = new THREE.DirectionalLight(0xffedd5, 1.25);
+      sunLight.position.set(24, 38, 20);
+      sunLight.castShadow = true;
+      sunLight.shadow.mapSize.width = 2048;
+      sunLight.shadow.mapSize.height = 2048;
+      const d = 22;
+      sunLight.shadow.camera.left = -d;
+      sunLight.shadow.camera.right = d;
+      sunLight.shadow.camera.top = d;
+      sunLight.shadow.camera.bottom = -d;
+      sunLight.shadow.bias = -0.0005;
+      scene.add(sunLight);
+
+      const rimLight = new THREE.DirectionalLight(0x38bdf8, 0.45);
+      rimLight.position.set(-20, 15, -20);
+      scene.add(rimLight);
+
+      // ============================================================================
+      // 3. 5-POINT CREATURE BUILDER
+      // ============================================================================
+      let creatureInstance = null;
+
+      function assembleCreature(cfg) {
+        const root = new THREE.Group();
+        const primaryColor = PALETTE[cfg.colorIndex];
+        const secondaryColor = 0xfffbeb; // Warm bone / cream
+        const darkAccent = 0x1e293b;
+
+        // 1. BODY CHASSIS
+        const bodyGroup = new THREE.Group();
+        root.add(bodyGroup);
+        const torsoNodes = [];
+
+        if (cfg.body === 'blob') {
+          const sphereGeo = new THREE.SphereGeometry(1.2, 16, 14);
+          sphereGeo.scale(1.15, 0.95, 1.1);
+          const torso = createCelMesh(sphereGeo, primaryColor, 0.07);
+          torso.position.y = 1.2;
+          bodyGroup.add(torso);
+          torsoNodes.push(torso);
+
+          // Belly patch
+          const bellyGeo = new THREE.SphereGeometry(0.75, 12, 12);
+          bellyGeo.scale(0.9, 0.85, 0.35);
+          const belly = createCelMesh(bellyGeo, secondaryColor, 0.05);
+          belly.position.set(0, 1.05, 0.65);
+          bodyGroup.add(belly);
+        } else if (cfg.body === 'grub') {
+          for (let seg = 0; seg < 4; seg++) {
+            const segGeo = new THREE.SphereGeometry(0.95 - seg * 0.12, 14, 12);
+            segGeo.scale(1.1, 0.85, 0.95);
+            const segMesh = createCelMesh(segGeo, (seg % 2 === 0) ? primaryColor : secondaryColor, 0.07);
+            segMesh.position.set(0, 1.05 - seg * 0.08, -seg * 0.75 + 0.8);
+            bodyGroup.add(segMesh);
+            torsoNodes.push(segMesh);
+          }
+        } else if (cfg.body === 'tank') {
+          const bellyGeo = new THREE.CylinderGeometry(1.0, 1.15, 0.75, 16);
+          const belly = createCelMesh(bellyGeo, primaryColor, 0.07);
+          belly.position.y = 1.05;
+          bodyGroup.add(belly);
+
+          const shellGeo = new THREE.SphereGeometry(1.35, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55);
+          const shell = createCelMesh(shellGeo, 0x334155, 0.07);
+          shell.position.set(0, 1.2, -0.1);
+          bodyGroup.add(shell);
+
+          // Spikes along dorsal line
+          for (let sp = -1; sp <= 1; sp += 2) {
+            const spike = createCelMesh(new THREE.ConeGeometry(0.2, 0.65, 6), secondaryColor, 0.08);
+            spike.position.set(sp * 0.6, 2.05, -0.2);
+            spike.rotation.x = -0.4;
+            spike.rotation.z = sp * 0.35;
+            bodyGroup.add(spike);
+          }
+          torsoNodes.push(belly);
+        }
+
+        // 2. OCULAR SENSORS
+        const eyesGroup = new THREE.Group();
+        bodyGroup.add(eyesGroup);
+
+        if (cfg.eyes === 'stalks') {
+          [-0.45, 0.45].forEach(side => {
+            const stalkStem = createCelMesh(new THREE.CylinderGeometry(0.08, 0.1, 0.65, 8), primaryColor, 0.08);
+            stalkStem.position.set(side, 1.95, 0.4);
+            stalkStem.rotation.x = 0.25;
+            stalkStem.rotation.z = -side * 0.35;
+            eyesGroup.add(stalkStem);
+
+            const bulb = createCelMesh(new THREE.SphereGeometry(0.32, 12, 12), 0xffffff, 0.08);
+            bulb.position.set(side * 1.3, 2.3, 0.55);
+            eyesGroup.add(bulb);
+
+            const pupil = createCelMesh(new THREE.SphereGeometry(0.12, 8, 8), 0x080c14, 0.1);
+            pupil.position.set(side * 1.3, 2.3, 0.85);
+            eyesGroup.add(pupil);
+          });
+        } else if (cfg.eyes === 'triple') {
+          const specs = [
+            { x: 0, y: 1.8, z: 1.05, r: 0.28 },
+            { x: -0.42, y: 1.65, z: 0.95, r: 0.2 },
+            { x: 0.42, y: 1.65, z: 0.95, r: 0.2 }
+          ];
+          specs.forEach(s => {
+            const eye = createCelMesh(new THREE.SphereGeometry(s.r, 10, 10), 0xf43f5e, 0.08);
+            eye.position.set(s.x, s.y, s.z);
+            eyesGroup.add(eye);
+            const slit = createCelMesh(new THREE.BoxGeometry(s.r * 0.3, s.r * 1.3, s.r * 0.8), 0x080c14, 0.1);
+            slit.position.set(s.x, s.y, s.z + s.r * 0.6);
+            eyesGroup.add(slit);
+          });
+        } else if (cfg.eyes === 'cyclops') {
+          const rim = createCelMesh(new THREE.TorusGeometry(0.48, 0.11, 8, 18), 0xd97706, 0.08);
+          rim.position.set(0, 1.7, 1.02);
+          eyesGroup.add(rim);
+
+          const eyeball = createCelMesh(new THREE.SphereGeometry(0.45, 14, 14), 0xffffff, 0.08);
+          eyeball.position.set(0, 1.7, 0.95);
+          eyesGroup.add(eyeball);
+
+          const pupil = createCelMesh(new THREE.SphereGeometry(0.2, 8, 8), 0x0284c7, 0.1);
+          pupil.position.set(0, 1.7, 1.35);
+          eyesGroup.add(pupil);
+        }
+
+        // 3. FEEDING MAW
+        const mouthGroup = new THREE.Group();
+        bodyGroup.add(mouthGroup);
+        let mawPart = null;
+
+        if (cfg.mouth === 'toothy') {
+          const jaw = createCelMesh(new THREE.BoxGeometry(0.85, 0.38, 0.48), 0x881337, 0.08);
+          jaw.position.set(0, 1.15, 0.95);
+          mouthGroup.add(jaw);
+          mawPart = jaw;
+
+          [-0.26, 0, 0.26].forEach(tx => {
+            const toothTop = createCelMesh(new THREE.ConeGeometry(0.08, 0.2, 5), secondaryColor, 0.1);
+            toothTop.rotation.x = Math.PI;
+            toothTop.position.set(tx, 1.3, 1.2);
+            mouthGroup.add(toothTop);
+
+            const toothBtm = createCelMesh(new THREE.ConeGeometry(0.08, 0.2, 5), secondaryColor, 0.1);
+            toothBtm.position.set(tx, 1.0, 1.2);
+            mouthGroup.add(toothBtm);
+          });
+        } else if (cfg.mouth === 'beak') {
+          const beak = createCelMesh(new THREE.ConeGeometry(0.35, 0.95, 8), 0xf59e0b, 0.08);
+          beak.rotation.x = Math.PI / 2;
+          beak.position.set(0, 1.2, 1.35);
+          mouthGroup.add(beak);
+          mawPart = beak;
+        } else if (cfg.mouth === 'vacuum') {
+          const prob = createCelMesh(new THREE.CylinderGeometry(0.18, 0.32, 0.8, 10), primaryColor, 0.08);
+          prob.rotation.x = Math.PI / 2.2;
+          prob.position.set(0, 1.15, 1.05);
+          mouthGroup.add(prob);
+
+          const suctionRing = createCelMesh(new THREE.TorusGeometry(0.22, 0.08, 8, 16), 0x881337, 0.09);
+          suctionRing.position.set(0, 0.95, 1.5);
+          mouthGroup.add(suctionRing);
+          mawPart = prob;
+        }
+
+        // 4. FRONT APPENDAGES / WEAPONS
+        const frontGroup = new THREE.Group();
+        bodyGroup.add(frontGroup);
+        const weaponAnimators = [];
+
+        if (cfg.front === 'pincers') {
+          [-1, 1].forEach(side => {
+            const arm = new THREE.Group();
+            arm.position.set(side * 1.05, 1.35, 0.4);
+
+            const bicep = createCelMesh(new THREE.CylinderGeometry(0.12, 0.14, 0.7, 8), primaryColor, 0.08);
+            bicep.position.set(side * 0.25, 0.2, 0.25);
+            bicep.rotation.z = -side * 0.55;
+            bicep.rotation.x = 0.5;
+            arm.add(bicep);
+
+            const clawGeo = new THREE.ConeGeometry(0.2, 1.1, 7);
+            clawGeo.scale(0.35, 1.0, 1.0);
+            clawGeo.rotateX(Math.PI * 0.85);
+            const claw = createCelMesh(clawGeo, secondaryColor, 0.09);
+            claw.position.set(side * 0.5, 0.25, 0.8);
+            claw.rotation.y = -side * 0.35;
+            arm.add(claw);
+
+            frontGroup.add(arm);
+            weaponAnimators.push({ root: arm, side, type: 'pincers' });
+          });
+        } else if (cfg.front === 'thorns') {
+          [-1, 1].forEach(side => {
+            const cluster = new THREE.Group();
+            cluster.position.set(side * 1.05, 1.35, 0.3);
+
+            const pod = createCelMesh(new THREE.DodecahedronGeometry(0.35), 0x881337, 0.08);
+            cluster.add(pod);
+
+            for (let sp = 0; sp < 4; sp++) {
+              const spike = createCelMesh(new THREE.ConeGeometry(0.1, 0.55, 6), 0xd97706, 0.09);
+              spike.rotation.x = Math.PI / 2;
+              spike.position.set(Math.sin(sp * 1.5) * 0.22, Math.cos(sp * 1.5) * 0.22, 0.28);
+              spike.rotation.y = side * 0.3;
+              spike.rotation.z = sp * 0.8;
+              cluster.add(spike);
+            }
+
+            frontGroup.add(cluster);
+            weaponAnimators.push({ root: cluster, side, type: 'thorns' });
+          });
+        } else if (cfg.front === 'flippers') {
+          [-1, 1].forEach(side => {
+            const flipper = new THREE.Group();
+            flipper.position.set(side * 1.0, 1.25, 0.3);
+
+            const paddleGeo = new THREE.BoxGeometry(0.2, 0.1, 0.85);
+            paddleGeo.rotateZ(side * 0.35);
+            const paddle = createCelMesh(paddleGeo, secondaryColor, 0.09);
+            paddle.position.set(side * 0.3, 0, 0.3);
+            flipper.add(paddle);
+
+            frontGroup.add(flipper);
+            weaponAnimators.push({ root: flipper, side, type: 'flippers' });
+          });
+        }
+
+        // 5. LOCOMOTION LIMBS (DIRECT GAIT ALTERATION)
+        const rearGroup = new THREE.Group();
+        root.add(rearGroup);
+        const legAnimators = [];
+
+        if (cfg.rear === 'biped') {
+          [-1, 1].forEach(side => {
+            const hip = new THREE.Group();
+            hip.position.set(side * 0.75, 0.95, -0.15);
+
+            const thigh = createCelMesh(new THREE.CylinderGeometry(0.2, 0.16, 0.75, 8), primaryColor, 0.08);
+            thigh.position.set(0, -0.22, -0.18);
+            thigh.rotation.x = -0.65;
+            hip.add(thigh);
+
+            const foot = createCelMesh(new THREE.BoxGeometry(0.42, 0.16, 0.8), secondaryColor, 0.09);
+            foot.position.set(0, -0.75, 0.2);
+            hip.add(foot);
+
+            rearGroup.add(hip);
+            legAnimators.push({ root: hip, side, type: 'biped' });
+          });
+        } else if (cfg.rear === 'quad') {
+          const paws = [
+            { side: -1, z: 0.55 }, { side: 1, z: 0.55 },
+            { side: -1, z: -0.55 }, { side: 1, z: -0.55 }
+          ];
+          paws.forEach((p, idx) => {
+            const hip = new THREE.Group();
+            hip.position.set(p.side * 0.85, 0.75, p.z);
+
+            const leg = createCelMesh(new THREE.CylinderGeometry(0.18, 0.16, 0.65, 8), secondaryColor, 0.08);
+            leg.position.y = -0.3;
+            hip.add(leg);
+
+            const paw = createCelMesh(new THREE.SphereGeometry(0.24, 8, 8), darkAccent, 0.09);
+            paw.position.set(0, -0.58, 0.06);
+            paw.scale.set(1.1, 0.6, 1.2);
+            hip.add(paw);
+
+            rearGroup.add(hip);
+            legAnimators.push({ root: hip, side: p.side, type: 'quad', index: idx });
+          });
+        } else if (cfg.rear === 'centipede') {
+          [-0.65, 0, 0.65].forEach((zOff, row) => {
+            [-1, 1].forEach(side => {
+              const hip = new THREE.Group();
+              hip.position.set(side * 0.9, 0.6, zOff);
+
+              const coxa = createCelMesh(new THREE.CylinderGeometry(0.08, 0.08, 0.5, 6), primaryColor, 0.09);
+              coxa.position.set(side * 0.25, 0.1, 0);
+              coxa.rotation.z = -side * 0.7;
+              hip.add(coxa);
+
+              const tibia = createCelMesh(new THREE.ConeGeometry(0.08, 0.65, 6), secondaryColor, 0.09);
+              tibia.position.set(side * 0.52, -0.25, 0);
+              tibia.rotation.z = side * 0.5;
+              hip.add(tibia);
+
+              rearGroup.add(hip);
+              legAnimators.push({ root: hip, side, type: 'centipede', row });
+            });
+          });
+        } else if (cfg.rear === 'slither') {
+          const bellyPlate = createCelMesh(new THREE.BoxGeometry(1.25, 0.14, 2.2), 0x881337, 0.08);
+          bellyPlate.position.set(0, 0.1, -0.2);
+          rearGroup.add(bellyPlate);
+          legAnimators.push({ root: bellyPlate, type: 'slither' });
+        }
+
+        return {
+          root,
+          bodyGroup,
+          torsoNodes,
+          eyesGroup,
+          mouthGroup,
+          mawPart,
+          weaponAnimators,
+          legAnimators,
+          cfg
+        };
+      }
+
+      // ============================================================================
+      // 4. DYNAMIC DIAGNOSTIC STAT ENGINE
+      // ============================================================================
+      function updateDiagnosticStats() {
+        let speed = 5;
+        let bounce = 5;
+        let power = 5;
+        let harvest = 5;
+
+        // Locomotion Leg Impact
+        if (creatureConfig.rear === 'biped') {
+          speed += 2; bounce += 5;
+          document.getElementById('label-loco-desc').textContent = 'Kangaroo Hopper';
+        } else if (creatureConfig.rear === 'quad') {
+          speed += 3; bounce += 1;
+          document.getElementById('label-loco-desc').textContent = 'Quadruped Trot';
+        } else if (creatureConfig.rear === 'centipede') {
+          speed += 5; bounce -= 1;
+          document.getElementById('label-loco-desc').textContent = 'Centipede Scuttle';
+        } else if (creatureConfig.rear === 'slither') {
+          speed += 1; bounce += 2;
+          document.getElementById('label-loco-desc').textContent = 'Snake Slither';
+        }
+
+        // Weapon / Role Impact
+        const actionBtn = document.getElementById('btn-world-action');
+        const actionLabel = document.getElementById('btn-action-label');
+        const actionIcon = document.getElementById('btn-action-icon');
+        const hudRoleIcon = document.getElementById('hud-role-icon');
+        const hudRoleName = document.getElementById('hud-role-name');
+
+        if (creatureConfig.front === 'pincers') {
+          power += 5; harvest -= 2;
+          document.getElementById('label-role-desc').textContent = 'Melee Striker';
+          actionBtn.className = 'comic-btn bg-rose-600 text-white font-extrabold px-4 py-3 rounded-2xl flex items-center gap-2 text-sm shadow-lg';
+          actionLabel.textContent = 'Pincer Strike [Space]';
+          actionIcon.textContent = '⚔️';
+          hudRoleIcon.textContent = '⚔️';
+          hudRoleName.textContent = 'Melee Striker';
+        } else if (creatureConfig.front === 'thorns') {
+          power += 4; harvest += 1;
+          document.getElementById('label-role-desc').textContent = 'Spike Artillery';
+          actionBtn.className = 'comic-btn bg-amber-600 text-white font-extrabold px-4 py-3 rounded-2xl flex items-center gap-2 text-sm shadow-lg';
+          actionLabel.textContent = 'Thorn Spray [Space]';
+          actionIcon.textContent = '🌵';
+          hudRoleIcon.textContent = '🌵';
+          hudRoleName.textContent = 'Spike Artillery';
+        } else if (creatureConfig.front === 'flippers') {
+          power -= 4; harvest += 5;
+          document.getElementById('label-role-desc').textContent = 'Pure Gatherer';
+          actionBtn.className = 'comic-btn bg-emerald-600 text-white font-extrabold px-4 py-3 rounded-2xl flex items-center gap-2 text-sm shadow-lg';
+          actionLabel.textContent = 'Harvester Sweep [Space]';
+          actionIcon.textContent = '🧺';
+          hudRoleIcon.textContent = '🧺';
+          hudRoleName.textContent = 'Pure Gatherer (2x Yield)';
+        }
+
+        // Body chassis modifier
+        if (creatureConfig.body === 'blob') { bounce += 2; }
+        if (creatureConfig.body === 'grub') { harvest += 1; speed -= 1; }
+        if (creatureConfig.body === 'tank') { power += 2; bounce -= 2; speed -= 1; }
+
+        speed = Math.max(1, Math.min(10, speed));
+        bounce = Math.max(1, Math.min(10, bounce));
+        power = Math.max(1, Math.min(10, power));
+        harvest = Math.max(1, Math.min(10, harvest));
+
+        document.getElementById('stat-speed-val').textContent = speed;
+        document.getElementById('stat-speed-bar').style.width = `${speed * 10}%`;
+
+        document.getElementById('stat-bounce-val').textContent = bounce;
+        document.getElementById('stat-bounce-bar').style.width = `${bounce * 10}%`;
+
+        document.getElementById('stat-power-val').textContent = power;
+        document.getElementById('stat-power-bar').style.width = `${power * 10}%`;
+
+        document.getElementById('stat-harvest-val').textContent = harvest;
+        document.getElementById('stat-harvest-bar').style.width = `${harvest * 10}%`;
+      }
+
+      // ============================================================================
+      // 5. LAB DIORAMA & TURNTABLE
+      // ============================================================================
+      const labGroup = new THREE.Group();
+      scene.add(labGroup);
+
+      const labPedestal = new THREE.Group();
+      labGroup.add(labPedestal);
+
+      const turntable = createCelMesh(new THREE.CylinderGeometry(4.2, 4.6, 0.75, 32), 0x272f44, 0.05);
+      turntable.position.y = -0.38;
+      labPedestal.add(turntable);
+
+      const glowRing = createCelMesh(new THREE.TorusGeometry(3.6, 0.12, 8, 36), 0x22d3ee, 0.06);
+      glowRing.rotation.x = Math.PI / 2;
+      glowRing.position.y = 0.02;
+      labPedestal.add(glowRing);
+
+      function refreshCreature() {
+        if (creatureInstance && creatureInstance.root.parent) {
+          creatureInstance.root.parent.remove(creatureInstance.root);
+        }
+        creatureInstance = assembleCreature(creatureConfig);
+
+        if (gameMode === 'lab') {
+          labPedestal.add(creatureInstance.root);
+          creatureInstance.root.position.set(0, 0, 0);
+          creatureInstance.root.rotation.set(0, 0, 0);
+        } else {
+          worldGroup.add(creatureInstance.root);
+          creatureInstance.root.position.copy(playerData.pos);
+        }
+        updateDiagnosticStats();
+      }
+
+      // ============================================================================
+      // 6. ISOMETRIC WORLD ENVIRONMENT & ASSETS
+      // ============================================================================
+      const worldGroup = new THREE.Group();
+      scene.add(worldGroup);
+      worldGroup.visible = false;
+
+      const worldPickables = [];
+      const worldBerries = [];
+      const worldDummies = [];
+      const projectiles = [];
+
+      const playerData = {
+        pos: new THREE.Vector3(0, 0, 0),
+        targetPos: new THREE.Vector3(0, 0, 0),
+        facingAngle: 0,
+        isMoving: false,
+        isDancing: false,
+        isAttacking: false,
+        attackTimer: 0,
+        flourishTimer: 0
+      };
+
+      function createWorldTree(x, z) {
+        const tree = new THREE.Group();
+        tree.position.set(x, 0, z);
+
+        const trunk = createCelMesh(new THREE.CylinderGeometry(0.35, 0.55, 2.2, 7), 0x78350f, 0.08);
+        trunk.position.y = 1.1;
+        tree.add(trunk);
+
+        const foliage1 = createCelMesh(new THREE.DodecahedronGeometry(1.5), 0x15803d, 0.07);
+        foliage1.position.y = 2.6;
+        foliage1.scale.set(1.2, 0.9, 1.2);
+        tree.add(foliage1);
+
+        const foliage2 = createCelMesh(new THREE.DodecahedronGeometry(1.05), 0x22c55e, 0.07);
+        foliage2.position.y = 3.6;
+        tree.add(foliage2);
+
+        worldGroup.add(tree);
+      }
+
+      function createWorldMushroom(x, z, hexColor) {
+        const mush = new THREE.Group();
+        mush.position.set(x, 0, z);
+
+        const stem = createCelMesh(new THREE.CylinderGeometry(0.2, 0.35, 1.0, 8), 0xfef08a, 0.08);
+        stem.position.y = 0.5;
+        mush.add(stem);
+
+        const cap = createCelMesh(new THREE.SphereGeometry(0.85, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5), hexColor, 0.08);
+        cap.position.y = 1.0;
+        mush.add(cap);
+
+        for (let s = 0; s < 4; s++) {
+          const spot = createCelMesh(new THREE.SphereGeometry(0.14, 6, 6), 0xffffff, 0.0);
+          const a = s * 1.55;
+          spot.position.set(Math.cos(a) * 0.5, 1.3, Math.sin(a) * 0.5);
+          mush.add(spot);
+        }
+
+        worldGroup.add(mush);
+      }
+
+      function spawnBerry(x, z) {
+        const berryGroup = new THREE.Group();
+        berryGroup.position.set(x, 0.65, z);
+
+        const fruit = createCelMesh(new THREE.SphereGeometry(0.4, 10, 10), 0xf43f5e, 0.09);
+        berryGroup.add(fruit);
+
+        const stem = createCelMesh(new THREE.BoxGeometry(0.1, 0.25, 0.1), 0x15803d, 0.1);
+        stem.position.y = 0.42;
+        berryGroup.add(stem);
+
+        worldGroup.add(berryGroup);
+        worldBerries.push({ group: berryGroup, active: true, basePos: berryGroup.position.clone() });
+      }
+
+      function createDummy(x, z, name) {
+        const dummyGroup = new THREE.Group();
+        dummyGroup.position.set(x, 0, z);
+
+        const base = createCelMesh(new THREE.CylinderGeometry(0.7, 0.85, 1.6, 10), 0xd97706, 0.08);
+        base.position.y = 0.8;
+        dummyGroup.add(base);
+
+        const targetRing = createCelMesh(new THREE.TorusGeometry(0.42, 0.1, 8, 16), 0x991b1b, 0.09);
+        targetRing.position.set(0, 1.0, 0.72);
+        dummyGroup.add(targetRing);
+
+        const hat = createCelMesh(new THREE.ConeGeometry(0.5, 0.8, 6), 0x334155, 0.08);
+        hat.position.y = 1.85;
+        dummyGroup.add(hat);
+
+        dummyGroup.userData = { hp: 100, maxHp: 100, name, baseX: x, baseZ: z };
+        worldGroup.add(dummyGroup);
+        worldDummies.push(dummyGroup);
+      }
+
+      function buildWorld() {
+        // Diorama Hexagonal Island Slab
+        const islandGeo = new THREE.CylinderGeometry(26, 28, 3.5, 36);
+        const island = createCelMesh(islandGeo, 0x334155, 0.03, false, true);
+        island.position.y = -1.75;
+        worldGroup.add(island);
+        worldPickables.push(island);
+
+        // Lush Grass Surface
+        const grassGeo = new THREE.CylinderGeometry(25.8, 25.8, 0.35, 36);
+        const grass = createCelMesh(grassGeo, 0x4d7c0f, 0.02, false, true);
+        grass.position.y = 0.18;
+        worldGroup.add(grass);
+        worldPickables.push(grass);
+
+        // Scattered Trees
+        const trees = [
+          [-12, -8], [-14, 4], [-8, -14], [10, -12], [14, -6],
+          [15, 7], [-10, 14], [8, 14], [-3, -16], [12, -16]
+        ];
+        trees.forEach(([tx, tz]) => createWorldTree(tx, tz));
+
+        // Spotted Mushrooms
+        const shrooms = [
+          [-6, -4, 0xf43f5e], [7, -3, 0xa855f7], [-5, 7, 0x06b6d4],
+          [6, 9, 0xf97316], [-12, 2, 0xf43f5e], [11, 2, 0xa855f7]
+        ];
+        shrooms.forEach(([mx, mz, c]) => createWorldMushroom(mx, mz, c));
+
+        // Initial Food Berries
+        const berrySpots = [
+          [-3, -3], [4, -5], [-7, 3], [5, 4],
+          [-2, 9], [9, -1], [-8, -8], [2, -11]
+        ];
+        berrySpots.forEach(([bx, bz]) => spawnBerry(bx, bz));
+
+        // Interactive Combat Dummies
+        createDummy(5, 3, "Spike Dummy");
+        createDummy(-5, -4, "Target Golem");
+        createDummy(-3, 7, "Forest Sentinel");
+      }
+
+      // ============================================================================
+      // 7. PARTICLES & POPUP FX
+      // ============================================================================
+      const particles = [];
+
+      function spawnParticles(pos, hexColor = 0xf43f5e, count = 12, speedMult = 1.0) {
+        const geo = new THREE.BoxGeometry(0.18, 0.18, 0.18);
+        for (let i = 0; i < count; i++) {
+          const p = createCelMesh(geo, hexColor, 0.0, false, false);
+          p.position.copy(pos);
+          const a = Math.random() * Math.PI * 2;
+          const spd = (1.5 + Math.random() * 3.5) * speedMult;
+          scene.add(p);
+          particles.push({
+            mesh: p,
+            vel: new THREE.Vector3(Math.cos(a) * spd, 2.5 + Math.random() * 3.5, Math.sin(a) * spd),
+            life: 0.75
+          });
+        }
+      }
+
+      function projectToScreen(vec3) {
+        const v = vec3.clone();
+        v.project(camera);
+        return {
+          x: (v.x * 0.5 + 0.5) * window.innerWidth,
+          y: (-(v.y * 0.5) + 0.5) * window.innerHeight
+        };
+      }
+
+      function showComicPopup(worldPos, text, colorClass = 'text-amber-300') {
+        const screen = projectToScreen(worldPos);
+        const pop = document.createElement('div');
+        pop.className = `float-pop text-stroke-sm ${colorClass}`;
+        pop.style.left = `${screen.x}px`;
+        pop.style.top = `${screen.y}px`;
+        pop.textContent = text;
+        overlayContainer.appendChild(pop);
+        setTimeout(() => pop.remove(), 1050);
+      }
+
+      // ============================================================================
+      // 8. ACTIONS: COMBAT & GATHER LOGIC
+      // ============================================================================
+      function triggerAdaptationAction() {
+        if (gameMode !== 'world') return;
+        playerData.isAttacking = true;
+        playerData.attackTimer = 0.45;
+
+        const forward = new THREE.Vector3(
+          Math.sin(playerData.facingAngle) * 1.6,
+          1.1,
+          Math.cos(playerData.facingAngle) * 1.6
+        );
+        const actionPoint = playerData.pos.clone().add(forward);
+
+        if (creatureConfig.front === 'pincers') {
+          // Melee Heavy Snip Strike
+          spawnParticles(actionPoint, 0xf43f5e, 16, 1.2);
+          showComicPopup(actionPoint, '✂️ SNIP-CLACK! (-35)', 'text-rose-400');
+
+          worldDummies.forEach(dummy => {
+            const dist = dummy.position.distanceTo(playerData.pos);
+            if (dist < 3.0) {
+              dummy.userData.hp -= 35;
+              dummy.position.x += Math.sin(playerData.facingAngle) * 0.9;
+              dummy.position.z += Math.cos(playerData.facingAngle) * 0.9;
+              spawnParticles(dummy.position, 0xef4444, 12);
+              showComicPopup(dummy.position.clone().add(new THREE.Vector3(0, 2.0, 0)), '💥 HEAVY IMPACT!', 'text-amber-400');
+            }
+          });
+        } else if (creatureConfig.front === 'thorns') {
+          // 8-Way Radial Thorn Projectile Spray
+          showComicPopup(playerData.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), '🌵 THORN BARRAGE!', 'text-amber-300');
+
+          for (let i = 0; i < 8; i++) {
+            const thornGeo = new THREE.ConeGeometry(0.12, 0.55, 6);
+            thornGeo.rotateX(Math.PI / 2);
+            const thornMesh = createCelMesh(thornGeo, 0xd97706, 0.08, false, false);
+            thornMesh.position.copy(playerData.pos).add(new THREE.Vector3(0, 1.2, 0));
+
+            const angle = (i / 8) * Math.PI * 2;
+            thornMesh.rotation.y = angle;
+            scene.add(thornMesh);
+
+            projectiles.push({
+              mesh: thornMesh,
+              vel: new THREE.Vector3(Math.cos(angle) * 14, 0, Math.sin(angle) * 14),
+              life: 0.65
+            });
+          }
+        } else if (creatureConfig.front === 'flippers') {
+          // Pure Gatherer Vacuum Sweep
+          showComicPopup(playerData.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), '🧺 VACUUM SWEEP (2x Yield)', 'text-emerald-400');
+          performEat(true);
+        }
+      }
+
+      function performEat(isGathererSweep = false) {
+        if (gameMode !== 'world') return;
+        const searchRadius = isGathererSweep ? 4.5 : 2.5;
+        let consumedCount = 0;
+
+        worldBerries.forEach(b => {
+          if (b.active) {
+            const dist = playerData.pos.distanceTo(b.group.position);
+            if (dist < searchRadius) {
+              b.active = false;
+              b.group.visible = false;
+              consumedCount++;
+
+              const reward = (creatureConfig.front === 'flippers') ? 20 : 10;
+              organicMatterScore += reward;
+
+              spawnParticles(b.group.position, 0xf43f5e, 14);
+              showComicPopup(b.group.position.clone().add(new THREE.Vector3(0, 1.2, 0)), `+${reward} Organic Matter!`, 'text-emerald-400');
+
+              // Respawn berry in 4 seconds
+              setTimeout(() => {
+                const a = Math.random() * Math.PI * 2;
+                const r = 3 + Math.random() * 16;
+                b.group.position.set(Math.cos(a) * r, 0.65, Math.sin(a) * r);
+                b.basePos.copy(b.group.position);
+                b.group.visible = true;
+                b.active = true;
+              }, 4000);
+            }
+          }
+        });
+
+        document.getElementById('hud-score').textContent = `${organicMatterScore} Units`;
+
+        if (consumedCount === 0 && !isGathererSweep) {
+          showComicPopup(playerData.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), 'No berries in reach!', 'text-slate-400');
+        }
+      }
+
+      function performFlourish() {
+        playerData.flourishTimer = 1.0;
+        showComicPopup(playerData.pos.clone().add(new THREE.Vector3(0, 2.2, 0)), '✨ APEX FLOURISH! ✨', 'text-amber-300');
+      }
+
+      // ============================================================================
+      // 9. ANIMATION & KINEMATIC LOCOMOTION ENGINE
+      // ============================================================================
+      const clock = new THREE.Clock();
+
+      function updateCreatureLocomotion(creature, dt, elapsed, isMoving, isDancing, isAttacking) {
+        if (!creature) return;
+        const cfg = creature.cfg;
+        const gaitPhase = elapsed * (isMoving ? 13.0 : (isDancing ? 8.5 : 3.0));
+
+        // 1. CHASSIS MOVEMENT & POSTURE BASED ON REAR LOCOMOTION
+        if (cfg.rear === 'biped') {
+          // Kangaroo Hopper: High vertical leaping arcs, leans forward into jumps, squash on landing
+          if (isMoving) {
+            const hop = Math.abs(Math.sin(gaitPhase * 0.5));
+            creature.root.position.y = (gameMode === 'lab' ? 0 : playerData.pos.y) + hop * 0.85;
+
+            if (creature.torsoNodes.length > 0) {
+              creature.torsoNodes[0].rotation.x = 0.35 + hop * 0.25; // Forward lean
+              creature.torsoNodes[0].scale.set(1.0 - hop * 0.2, 1.0 + hop * 0.35, 1.0 - hop * 0.2); // Stretch
+            }
+          } else {
+            creature.root.position.y = gameMode === 'lab' ? 0 : playerData.pos.y;
+            if (creature.torsoNodes.length > 0) {
+              creature.torsoNodes[0].rotation.x = 0;
+              creature.torsoNodes[0].scale.set(1, 1, 1);
+            }
+          }
+        } else if (cfg.rear === 'quad') {
+          // Quadruped Trot: Steady low ground clearance, rhythmic diagonal roll
+          if (isMoving) {
+            creature.root.position.y = (gameMode === 'lab' ? 0 : playerData.pos.y) + Math.abs(Math.sin(gaitPhase)) * 0.15;
+            if (creature.torsoNodes.length > 0) {
+              creature.torsoNodes[0].rotation.z = Math.sin(gaitPhase * 0.5) * 0.1;
+              creature.torsoNodes[0].rotation.x = 0;
+            }
+          } else {
+            creature.root.position.y = gameMode === 'lab' ? 0 : playerData.pos.y;
+            if (creature.torsoNodes.length > 0) creature.torsoNodes[0].rotation.z = 0;
+          }
+        } else if (cfg.rear === 'centipede') {
+          // Centipede Scuttle: Flat low crawl, rapid high frequency scuttle
+          creature.root.position.y = gameMode === 'lab' ? 0 : playerData.pos.y;
+          if (isMoving && creature.torsoNodes.length > 0) {
+            creature.torsoNodes[0].rotation.y = Math.sin(gaitPhase * 1.5) * 0.08;
+          }
+        } else if (cfg.rear === 'slither') {
+          // Snake/Slug Slither: Belly on ground, accordion squash & sinusoidal horizontal wave
+          creature.root.position.y = (gameMode === 'lab' ? 0 : playerData.pos.y) - 0.15;
+          if (isMoving && creature.torsoNodes.length > 0) {
+            const wave = Math.sin(gaitPhase * 0.8);
+            creature.torsoNodes[0].rotation.y = wave * 0.35;
+            creature.torsoNodes[0].scale.set(1.0 + wave * 0.2, 0.9, 1.0 - wave * 0.2);
+          }
+        }
+
+        // 2. LEG ARTICULATION & GAIT CYCLES
+        creature.legAnimators.forEach((leg, i) => {
+          if (leg.type === 'biped') {
+            if (isMoving) {
+              const hop = Math.abs(Math.sin(gaitPhase * 0.5));
+              leg.root.rotation.x = -hop * 0.85;
+            } else {
+              leg.root.rotation.x = 0;
+            }
+          } else if (leg.type === 'quad') {
+            if (isMoving) {
+              const offset = (leg.index % 2 === 0) ? 0 : Math.PI;
+              leg.root.rotation.x = Math.sin(gaitPhase + offset) * 0.75;
+            } else {
+              leg.root.rotation.x = 0;
+            }
+          } else if (leg.type === 'centipede') {
+            if (isMoving) {
+              const ripple = gaitPhase * 1.8 + leg.row * 0.9 + (leg.side > 0 ? 0 : Math.PI * 0.5);
+              leg.root.rotation.x = Math.sin(ripple) * 0.7;
+              leg.root.rotation.z = (leg.side > 0 ? -1 : 1) * (0.2 + Math.abs(Math.cos(ripple)) * 0.3);
+            } else {
+              leg.root.rotation.x = 0;
+            }
+          } else if (leg.type === 'slither') {
+            if (isMoving) {
+              leg.root.rotation.y = Math.sin(gaitPhase * 0.8) * 0.35;
+            }
+          }
+        });
+
+        // 3. FRONT APPENDAGE ACTION & IDLE KINETICS
+        creature.weaponAnimators.forEach((w, idx) => {
+          if (isAttacking) {
+            if (w.type === 'pincers') {
+              w.root.rotation.y = (idx === 0 ? 1 : -1) * 1.25;
+              w.root.position.z = 0.85;
+            } else if (w.type === 'thorns') {
+              w.root.scale.set(1.4, 1.4, 1.4);
+            } else if (w.type === 'flippers') {
+              w.root.rotation.x = Math.sin(elapsed * 25) * 0.9;
+              w.root.rotation.z = (idx === 0 ? -1 : 1) * 0.7;
+            }
+          } else {
+            w.root.scale.set(1, 1, 1);
+            w.root.position.z = 0.4;
+            if (w.type === 'flippers') {
+              w.root.rotation.x = Math.sin(elapsed * 3 + idx) * 0.2;
+            } else {
+              w.root.rotation.y = 0;
+              w.root.rotation.x = Math.sin(elapsed * 2.5) * 0.1;
+            }
+          }
+        });
+      }
+
+      function gameLoop() {
+        requestAnimationFrame(gameLoop);
+        const dt = Math.min(clock.getDelta(), 0.1);
+        const elapsed = clock.getElapsedTime();
+
+        // 1. Particle Physics Update
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.life -= dt;
+          if (p.life <= 0) {
+            scene.remove(p.mesh);
+            particles.splice(i, 1);
+          } else {
+            p.vel.y -= 14 * dt;
+            p.mesh.position.addScaledVector(p.vel, dt);
+            p.mesh.rotation.x += 6 * dt;
+            p.mesh.rotation.y += 6 * dt;
+            p.mesh.scale.setScalar(p.life * 1.3);
+          }
+        }
+
+        // 2. Projectile Physics & Collisions
+        for (let j = projectiles.length - 1; j >= 0; j--) {
+          const proj = projectiles[j];
+          proj.life -= dt;
+          proj.mesh.position.addScaledVector(proj.vel, dt);
+
+          worldDummies.forEach(dummy => {
+            if (proj.mesh.position.distanceTo(dummy.position) < 1.3) {
+              dummy.userData.hp -= 20;
+              spawnParticles(dummy.position, 0xd97706, 10);
+              showComicPopup(dummy.position.clone().add(new THREE.Vector3(0, 1.8, 0)), '-20 Thorn Hit!', 'text-amber-400');
+              proj.life = 0;
+            }
+          });
+
+          if (proj.life <= 0) {
+            scene.remove(proj.mesh);
+            projectiles.splice(j, 1);
+          }
+        }
+
+        // 3. Floating Berries Idle
+        worldBerries.forEach(b => {
+          if (b.active) {
+            b.group.position.y = b.basePos.y + Math.sin(elapsed * 3 + b.basePos.x) * 0.12;
+            b.group.rotation.y += 1.4 * dt;
+          }
+        });
+
+        // 4. Lab Mode vs World Exploration Mode
+        if (gameMode === 'lab') {
+          if (!isDraggingLab) {
+            labPedestal.rotation.y += 0.4 * dt;
+          }
+          updateCreatureLocomotion(creatureInstance, dt, elapsed, false, isLabDancing, false);
+        } else {
+          // World Mode
+          if (playerData.isAttacking) {
+            playerData.attackTimer -= dt;
+            if (playerData.attackTimer <= 0) playerData.isAttacking = false;
+          }
+
+          if (playerData.flourishTimer > 0) {
+            playerData.flourishTimer -= dt;
+            creatureInstance.root.rotation.y += dt * 14;
+          }
+
+          // Keyboard Movement Vector
+          let mx = 0, mz = 0;
+          if (keys['KeyW'] || keys['ArrowUp']) { mx -= 1; mz -= 1; }
+          if (keys['KeyS'] || keys['ArrowDown']) { mx += 1; mz += 1; }
+          if (keys['KeyA'] || keys['ArrowLeft']) { mx -= 1; mz += 1; }
+          if (keys['KeyD'] || keys['ArrowRight']) { mx += 1; mz -= 1; }
+
+          let moveVec = new THREE.Vector3(mx, 0, mz);
+          if (moveVec.lengthSq() > 0.01) {
+            moveVec.normalize();
+            playerData.targetPos.copy(playerData.pos).addScaledVector(moveVec, 0.4);
+          }
+
+          const toTarget = playerData.targetPos.clone().sub(playerData.pos);
+          const dist = toTarget.length();
+
+          if (dist > 0.08) {
+            playerData.isMoving = true;
+            playerData.facingAngle = Math.atan2(toTarget.x, toTarget.z);
+
+            // Move speed altered by speed stat
+            const speedStat = parseInt(document.getElementById('stat-speed-val').textContent) || 5;
+            const currentMoveSpeed = 4.0 + speedStat * 0.55;
+
+            playerData.pos.addScaledVector(toTarget.normalize(), Math.min(dist, currentMoveSpeed * dt));
+
+            if (playerData.pos.length() > 21) {
+              playerData.pos.clampLength(0, 21);
+              playerData.targetPos.copy(playerData.pos);
+            }
+          } else {
+            playerData.isMoving = false;
+          }
+
+          if (creatureInstance) {
+            creatureInstance.root.position.x = playerData.pos.x;
+            creatureInstance.root.position.z = playerData.pos.z;
+
+            let rotDiff = playerData.facingAngle - creatureInstance.root.rotation.y;
+            while (rotDiff < -Math.PI) rotDiff += Math.PI * 2;
+            while (rotDiff > Math.PI) rotDiff -= Math.PI * 2;
+            creatureInstance.root.rotation.y += rotDiff * 14 * dt;
+          }
+
+          updateCreatureLocomotion(
+            creatureInstance,
+            dt,
+            elapsed,
+            playerData.isMoving,
+            playerData.isDancing,
+            playerData.isAttacking
+          );
+
+          // Camera follow
+          const targetCam = new THREE.Vector3(
+            playerData.pos.x + 14,
+            15,
+            playerData.pos.z + 14
+          );
+          camera.position.lerp(targetCam, 0.1);
+        }
+
+        renderer.render(scene, camera);
+      }
+
+      // ============================================================================
+      // 10. INPUT & EVENT LISTENERS
+      // ============================================================================
+      const keys = {};
+      window.addEventListener('keydown', e => {
+        keys[e.code] = true;
+        if (gameMode === 'world') {
+          if (e.code === 'Space') {
+            e.preventDefault();
+            triggerAdaptationAction();
+          } else if (e.code === 'KeyE') {
+            performEat();
+          } else if (e.code === 'KeyQ') {
+            performFlourish();
+          }
+        }
+      });
+      window.addEventListener('keyup', e => { keys[e.code] = false; });
+
+      // Lab Turntable Drag
+      container.addEventListener('pointerdown', e => {
+        if (gameMode === 'lab') {
+          isDraggingLab = true;
+          lastPointerX = e.clientX;
+        } else {
+          // World Raycast Move
+          const pointer = new THREE.Vector2(
+            (e.clientX / window.innerWidth) * 2 - 1,
+            -(e.clientY / window.innerHeight) * 2 + 1
+          );
+          const raycaster = new THREE.Raycaster();
+          raycaster.setFromCamera(pointer, camera);
+          const hits = raycaster.intersectObjects(worldPickables, false);
+
+          if (hits.length > 0) {
+            const pt = hits[0].point;
+            playerData.targetPos.set(pt.x, 0, pt.z);
+
+            const ripple = createCelMesh(new THREE.RingGeometry(0.2, 0.55, 16), 0x38bdf8, 0.0, false, false);
+            ripple.rotation.x = -Math.PI / 2;
+            ripple.position.set(pt.x, 0.22, pt.z);
+            worldGroup.add(ripple);
+            setTimeout(() => worldGroup.remove(ripple), 350);
+          }
+        }
+      });
+
+      window.addEventListener('pointermove', e => {
+        if (gameMode === 'lab' && isDraggingLab) {
+          const dx = e.clientX - lastPointerX;
+          labPedestal.rotation.y += dx * 0.012;
+          lastPointerX = e.clientX;
+        }
+      });
+
+      window.addEventListener('pointerup', () => { isDraggingLab = false; });
+
+      // ============================================================================
+      // 11. UI WIRING & BUTTON ACTIONS
+      // ============================================================================
+      // Palette Swatches
+      const swatchBox = document.getElementById('color-swatches');
+      PALETTE.forEach((hex, idx) => {
+        const sw = document.createElement('button');
+        sw.className = `w-7 h-7 rounded-full border-2 border-slate-950 transition-transform ${idx === 0 ? 'scale-125 ring-2 ring-white' : ''}`;
+        sw.style.backgroundColor = `#${hex.toString(16).padStart(6, '0')}`;
+        sw.addEventListener('click', () => {
+          creatureConfig.colorIndex = idx;
+          swatchBox.querySelectorAll('button').forEach((b, bi) => {
+            b.classList.toggle('scale-125', bi === idx);
+            b.classList.toggle('ring-2', bi === idx);
+            b.classList.toggle('ring-white', bi === idx);
+          });
+          refreshCreature();
+        });
+        swatchBox.appendChild(sw);
+      });
+
+      // Part Mutation Selection
+      document.querySelectorAll('.part-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const slot = btn.dataset.slot;
+          const val = btn.dataset.val;
+          creatureConfig[slot] = val;
+
+          const parent = btn.parentElement;
+          parent.querySelectorAll('button').forEach(b => {
+            b.classList.remove('bg-emerald-600', 'bg-indigo-600', 'bg-rose-600', 'bg-cyan-600', 'bg-amber-600', 'text-white');
+            b.classList.add('bg-slate-700', 'text-slate-200');
+          });
+
+          const activeColors = {
+            body: 'bg-emerald-600',
+            rear: 'bg-indigo-600',
+            front: 'bg-rose-600',
+            eyes: 'bg-cyan-600',
+            mouth: 'bg-amber-600'
+          };
+          btn.classList.add(activeColors[slot], 'text-white');
+          btn.classList.remove('bg-slate-700', 'text-slate-200');
+
+          refreshCreature();
+        });
+      });
+
+      // Randomizer
+      document.getElementById('btn-randomize').addEventListener('click', () => {
+        const options = {
+          body: ['blob', 'grub', 'tank'],
+          rear: ['biped', 'quad', 'centipede', 'slither'],
+          front: ['pincers', 'thorns', 'flippers'],
+          eyes: ['stalks', 'triple', 'cyclops'],
+          mouth: ['toothy', 'beak', 'vacuum']
+        };
+
+        Object.keys(options).forEach(slot => {
+          const list = options[slot];
+          const chosen = list[Math.floor(Math.random() * list.length)];
+          creatureConfig[slot] = chosen;
+
+          const group = document.getElementById(`group-${slot}`);
+          group.querySelectorAll('button').forEach(b => {
+            b.classList.remove('bg-emerald-600', 'bg-indigo-600', 'bg-rose-600', 'bg-cyan-600', 'bg-amber-600', 'text-white');
+            b.classList.add('bg-slate-700', 'text-slate-200');
+            if (b.dataset.val === chosen) {
+              const activeColors = {
+                body: 'bg-emerald-600',
+                rear: 'bg-indigo-600',
+                front: 'bg-rose-600',
+                eyes: 'bg-cyan-600',
+                mouth: 'bg-amber-600'
+              };
+              b.classList.add(activeColors[slot], 'text-white');
+              b.classList.remove('bg-slate-700', 'text-slate-200');
+            }
+          });
+        });
+
+        creatureConfig.colorIndex = Math.floor(Math.random() * PALETTE.length);
+        swatchBox.querySelectorAll('button').forEach((b, bi) => {
+          b.classList.toggle('scale-125', bi === creatureConfig.colorIndex);
+          b.classList.toggle('ring-2', bi === creatureConfig.colorIndex);
+          b.classList.toggle('ring-white', bi === creatureConfig.colorIndex);
+        });
+
+        refreshCreature();
+        spawnParticles(new THREE.Vector3(0, 1.5, 0), 0xa855f7, 16);
+      });
+
+      // Dance Test in Lab
+      document.getElementById('btn-lab-dance').addEventListener('click', () => {
+        isLabDancing = !isLabDancing;
+        document.getElementById('dance-icon').textContent = isLabDancing ? '🕺' : '🧍';
+        document.getElementById('btn-lab-dance').classList.toggle('bg-amber-500', isLabDancing);
+      });
+
+      // Spawn Into World
+      document.getElementById('btn-spawn-world').addEventListener('click', () => {
+        gameMode = 'world';
+        document.getElementById('ui-lab').classList.add('hidden');
+        document.getElementById('ui-world').classList.remove('hidden');
+        document.getElementById('ui-world').classList.add('flex');
+
+        labGroup.visible = false;
+        worldGroup.visible = true;
+
+        playerData.pos.set(0, 0, 0);
+        playerData.targetPos.set(0, 0, 0);
+        playerData.facingAngle = 0;
+        refreshCreature();
+
+        showComicPopup(new THREE.Vector3(0, 2.5, 0), 'EXPLORE THE WILD!', 'text-emerald-400');
+      });
+
+      // Return To Lab
+      document.getElementById('btn-return-lab').addEventListener('click', () => {
+        gameMode = 'lab';
+        document.getElementById('ui-world').classList.add('hidden');
+        document.getElementById('ui-world').classList.remove('flex');
+        document.getElementById('ui-lab').classList.remove('hidden');
+
+        worldGroup.visible = false;
+        labGroup.visible = true;
+
+        camera.position.copy(labCamPos);
+        refreshCreature();
+      });
+
+      // World Action HUD Buttons
+      document.getElementById('btn-world-action').addEventListener('click', triggerAdaptationAction);
+      document.getElementById('btn-world-eat').addEventListener('click', () => performEat(false));
+      document.getElementById('btn-world-flourish').addEventListener('click', performFlourish);
+
+      // Window Resize Listener
+      window.addEventListener('resize', () => {
+        const newAspect = window.innerWidth / window.innerHeight;
+        camera.left = -frustumSize * newAspect / 2;
+        camera.right = frustumSize * newAspect / 2;
+        camera.top = frustumSize / 2;
+        camera.bottom = -frustumSize / 2;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Initialize World & Start Engine
+      buildWorld();
+      refreshCreature();
+      gameLoop();
+    };
+  </script>
+</body>
+</html>

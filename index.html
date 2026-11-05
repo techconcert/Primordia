@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Primordia Web</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+  <link rel="stylesheet" href="css/editor.css">
+</head>
+<body>
+  <div id="canvas-container"></div>
+  <div id="hud"></div>
+  <div id="editor-ui"></div>
+  <div id="popups"></div>
+  <div id="toasts"></div>
+  <div id="title"></div>
+  <div id="pause"></div>
+  <div id="corner"></div>
+  <div id="modal"></div>
+  <div id="fade"></div>
+  <div id="debug"></div>
+
+  <script src="lib/three.min.js"></script>
+  <script src="js/testrig/autoplay.js"></script><!-- test rig: inert unless ?autoplay=1 -->
+  <script src="js/core/util.js"></script>
+  <script src="js/core/render.js"></script>
+  <script src="js/core/camera.js"></script>
+  <script src="js/core/input.js"></script>
+  <script src="js/core/ui.js"></script>
+  <script src="js/core/audio.js"></script>
+  <script src="js/core/save.js"></script>
+  <script src="js/creature/parts.js"></script>
+  <script src="js/creature/model.js"></script>
+  <script src="js/creature/mesh.js"></script>
+  <script src="js/creature/anim.js"></script>
+  <script src="js/creature/gen.js"></script>
+  <script src="js/editors/catalogs.js"></script>
+  <script src="js/editors/assembly.js"></script>
+  <script src="js/editors/editor.js"></script>
+  <script src="js/world/planet.js"></script>
+  <script src="js/world/sky.js"></script>
+  <script src="js/world/physics.js"></script>
+  <script src="js/world/waterfx.js"></script>
+  <script src="js/world/eco.js"></script>
+  <script src="js/stages/intro.js"></script>
+  <script src="js/stages/cell.js"></script>
+  <script src="js/stages/creature.js"></script>
+  <script src="js/stages/creature_hud.js"></script>
+  <script src="js/stages/creature_social.js"></script>
+  <script src="js/stages/rts_touch.js"></script>
+  <script src="js/stages/tribal_sites.js"></script>
+  <script src="js/stages/tribal.js"></script>
+  <script src="js/stages/tribal_world.js"></script>
+  <script src="js/stages/tribal_ui.js"></script>
+  <script src="js/stages/civ.js"></script>
+  <script src="js/stages/civ_util.js"></script>
+  <script src="js/stages/civ_city.js"></script>
+  <script src="js/stages/civ_units.js"></script>
+  <script src="js/stages/civ_ai.js"></script>
+  <script src="js/stages/civ_ui.js"></script>
+  <script src="js/stages/space.js"></script>
+  <script src="js/stages/space_galaxy.js"></script>
+  <script src="js/stages/space_ui.js"></script>
+  <script src="js/stages/space_sys.js"></script>
+  <script src="js/stages/space_orbit.js"></script>
+  <script src="js/testrig/bot_editor.js"></script>
+  <script src="js/testrig/bot_cell.js"></script>
+  <script src="js/testrig/bot_creature.js"></script>
+  <script src="js/testrig/bot_tribal.js"></script>
+  <script src="js/testrig/bot_civ.js"></script>
+  <script src="js/testrig/bot_space.js"></script>
+  <script src="js/core/game.js"></script>
+</body>
+</html>

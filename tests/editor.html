@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>Editor harness</title>
+<link rel="stylesheet" href="../css/style.css"><link rel="stylesheet" href="../css/editor.css">
+<style>
+ #harness{position:fixed;right:8px;bottom:8px;z-index:60;display:flex;gap:4px;flex-wrap:wrap;max-width:46vw;justify-content:flex-end}
+ #harness button{font:600 11px sans-serif;padding:3px 7px;border-radius:6px;border:2px solid #080c14;background:#334155;color:#fff;cursor:pointer;opacity:.85}
+ #log{position:fixed;left:8px;bottom:2px;z-index:60;font:11px monospace;color:#94a3b8;max-width:50vw;pointer-events:none}
+</style></head>
+<body style="margin:0;background:#0d121d;overflow:hidden">
+<div id="canvas-container" style="position:absolute;inset:0"></div>
+<div id="hud"></div><div id="popups"></div><div id="toasts"></div><div id="modal"></div><div id="editor-ui"></div>
+<div id="harness"></div><div id="log"></div>
+<script src="../lib/three.min.js"></script>
+<script src="../js/core/util.js"></script>
+<script src="../js/core/render.js"></script>
+<script src="../js/core/input.js"></script>
+<script src="../js/core/ui.js"></script>
+<script src="../js/core/audio.js"></script>
+<script src="../js/creature/parts.js"></script>
+<script src="../js/creature/model.js"></script>
+<script src="../js/creature/mesh.js"></script>
+<script src="../js/creature/anim.js"></script>
+<script src="../js/creature/gen.js"></script>
+<!-- real creature files, when present, are listed here; the shim fills any gaps -->
+<script src="_shim_editor.js"></script>
+<script src="../js/editors/catalogs.js"></script>
+<script src="../js/editors/assembly.js"></script>
+<script src="../js/editors/editor.js"></script>
+<script>
+(function () {
+  const SP = window.SP, q = new URLSearchParams(location.search);
+  SP.render.init(document.getElementById('canvas-container'));
+  const log = document.getElementById('log');
+  window.__results = [];
+  function openMode(mode, extra) {
+    const o = Object.assign({ mode: mode, design: null, budget: mode === 'cell' || mode === 'creature' ? 300 : null, currency: mode === 'building' || mode === 'vehicle' || mode === 'ship' ? 'Primordiabucks' : 'DNA', unlocked: 'all', title: undefined }, extra || {});
+    if (q.get('budget')) o.budget = Number(q.get('budget'));
+    if (mode === 'outfit') { o.design = SP.creature.defaultDesign('creature'); o.budget = 200; o.currency = 'Food'; }
+    if (mode === 'vehicle') o.vehicleType = q.get('role') || 'land';
+    if (mode === 'building') o.buildingType = q.get('role') || 'cityhall';
+    if (q.get('locked')) o.unlocked = SP.parts.defaultUnlocked ? SP.parts.defaultUnlocked() : [];
+    SP.editor.open(o).then(function (r) {
+      const s = r ? ('DONE ' + r.design.name + ' spent=' + r.spent + ' parts=' + ((r.design.parts || []).length)) : 'CANCELLED';
+      log.textContent = mode + ': ' + s; console.log('editor result', mode, s); window.__results.push({ mode: mode, result: r });
+    });
+  }
+  window.openMode = openMode;
+  const bar = document.getElementById('harness');
+  ['cell', 'creature', 'outfit', 'building', 'vehicle', 'ship'].forEach(function (m) { const b = document.createElement('button'); b.textContent = m; b.onclick = function () { openMode(m); }; bar.appendChild(b); });
+  let last = performance.now();
+  (function loop(t) { requestAnimationFrame(loop); const dt = Math.min(0.05, (t - last) / 1000); last = t; if (SP.editor.isOpen) { SP.editor.update(dt); SP.render.render(SP.editor.scene, SP.editor.camera); } })(last);
+  if (q.get('mode')) openMode(q.get('mode'));
+})();
+</script></body></html>
